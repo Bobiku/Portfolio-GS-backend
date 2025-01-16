@@ -88,38 +88,50 @@ exports.retrieveBlockChildren = async (req, res) => {
     if (cachedData) {
         return res.json(cachedData);
     } else {
-        const blocks = [];
+        
         try {
-            // Requête API Notion
-            const response = await notion.blocks.children.list({
-                block_id: pageId,
-                page_size: 100,
-            });
-            // Si pas de block trouvée
-            if (!response.results || response.results.length === 0) {
-                return res.status(404).json({ error: 'Aucun bloc trouvé pour cette page.' });
+            const blocks = [];
+            let hasMore = true;
+            let cursor = undefined; // Initialisez le curseur à undefined pour la première requête
+
+            while (hasMore) {
+                // Requête API Notion
+                const response = await notion.blocks.children.list({
+                    block_id: pageId,
+                    page_size: 100,
+                    start_cursor: cursor, // Utilisez le curseur pour les requêtes suivantes
+                });
+                
+                // Si pas de block trouvée
+                if (!response.results || response.results.length === 0) {
+                    return res.status(404).json({ error: 'Aucun bloc trouvé pour cette page.' });
+                }
+                // Traitement des résultats de la requête
+                response.results.forEach((result) => {
+                    const type = result.type;
+                    let block = '';
+                    if (type === "image") {
+                        const imageUrl = result[type]?.external?.url || result[type]?.file?.url || "";
+                        block = { type: type, content: imageUrl };
+                    }
+                    else {
+                        const content = result[type]?.rich_text || [];
+                        const textContent = content.map(item => item.text.content).join("");
+                        block = { type: type, content: textContent }
+                    }
+                    blocks.push(block);
+                });
+
+                // Mettez à jour les variables de pagination
+                hasMore = response.has_more;
+                cursor = response.next_cursor;
             }
-            // Traitement des résultats de la requête
-            response.results.forEach((result) => {
-                const type = result.type;
-                let block = '';
-                if (type === "image") {
-                    const imageUrl = result[type]?.external?.url || result[type]?.file?.url || "";
-                    block = { type: type, content: imageUrl };
-                }
-                else {
-                    const content = result[type]?.rich_text || [];
-                    const textContent = content.map(item => item.text.content).join("");
-                    block = { type: type, content: textContent }
-                }
-                blocks.push(block);
-            });
-            myCache.set(cacheKey, blocks); // Mise en cache des données
-            // Envoie de la réponse
-            res.status(200).json(blocks);
+                myCache.set(cacheKey, blocks); // Mise en cache des données
+                // Envoie de la réponse
+                res.status(200).json(blocks);
         } catch (error) {
             console.error('Erreur lors de la récupération des blocs:', error);
-            res.status(500).json({ error: 'Impossible de récupérer les blocs de la page.' });
+            res.status(404).json({ error: 'Impossible de récupérer les blocs de la page.' });
         }
     }
 };

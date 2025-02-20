@@ -42,7 +42,8 @@ testem.log
 Thumbs.db
 
 # environment
-.env
+.env.development
+.env.production
 
 # Redis
 dump.rdb

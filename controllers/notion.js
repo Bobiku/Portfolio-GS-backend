@@ -31,14 +31,32 @@ exports.queryDatabase = async (req, res) => {
 
         const databaseId = process.env.NOTION_DATABASE_ID;
         const projets = [];
-        const response = await notion.databases.query({
-            database_id: databaseId,
-            filter: {
+
+        // Construire le filtre en fonction de l'environnement
+        const filter = {
+            or: [
+                {
+                    property: 'State',
+                    multi_select: {
+                        contains: 'Published'
+                    }
+                }
+            ]
+        };
+
+        // Ajouter InProgress uniquement en développement
+        if (process.env.SHOW_IN_PROGRESS === 'true') {
+            filter.or.push({
                 property: 'State',
                 multi_select: {
-                    contains: 'Published',
-                },
-            },
+                    contains: 'InProgress'
+                }
+            });
+        }
+
+        const response = await notion.databases.query({
+            database_id: databaseId,
+            filter: filter,
             sorts: [
                 {
                     property: 'Date',

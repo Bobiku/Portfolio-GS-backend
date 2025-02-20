@@ -43,3 +43,7 @@ Thumbs.db
 
 # environment
 .env
+
+# Redis
+dump.rdb
+*.rdb

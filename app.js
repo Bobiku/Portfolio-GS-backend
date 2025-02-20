@@ -3,6 +3,7 @@ const cors = require('cors');
 const compression = require('compression');
 const redis = require('redis');
 const notionRoutes = require('./routes/notion');
+const cacheRoutes = require('./routes/cache');
 
 const app = express();
 const redisClient = redis.createClient();
@@ -23,5 +24,6 @@ app.use('/api/notion', (req, res, next) => {
     req.redisClient = redisClient;
     next();
 }, notionRoutes);
+app.use('/api/cache', cacheRoutes); // Utilisez les routes de cache
 
 module.exports = app;

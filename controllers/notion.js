@@ -1,13 +1,11 @@
 // Imports
 const { Client } = require("@notionhq/client")
 const dotenv = require('dotenv');
-const NodeCache = require('node-cache');
+const cache = require('../utils/cache');
 const { Projet } = require('../models/projet');
 
 // Charger les variables d'environnement
 dotenv.config();
-
-const myCache = new NodeCache({ stdTTL: 3600 }); // Cache for 1 hour
 
 // Initializing a client
 const notion = new Client({
@@ -24,114 +22,118 @@ const notion = new Client({
 
 exports.queryDatabase = async (req, res) => {
     const cacheKey = 'notionData';
-    const cachedData = myCache.get(cacheKey);
+    
+    try {
+        const cachedData = await cache.get(cacheKey);
+        if (cachedData) {
+            return res.json(cachedData);
+        }
 
-    if (cachedData) {
-        return res.json(cachedData);
-    } else {
         const databaseId = process.env.NOTION_DATABASE_ID;
         const projets = [];
-        try {
-            // Requête API Notion
-            const response = await notion.databases.query({
-                database_id: databaseId,
-                filter: {
-                    property: 'State',
-                    multi_select: {
-                        contains: 'Published',
-                    },
+        const response = await notion.databases.query({
+            database_id: databaseId,
+            filter: {
+                property: 'State',
+                multi_select: {
+                    contains: 'Published',
                 },
-                sorts: [
-                    {
-                        property: 'Date',
-                        direction: 'descending',
-                    },
-                ]
-            });
-            // Si pas de block trouvée
-            if (!response.results || response.results.length === 0) {
-                return res.status(404).json({ error: 'Aucune page trouvée pour cette database.' });
-            }
-            // Traitement des résultats de la requête
-            response.results.forEach((result) => {
-                const properties = result.properties;
-            
-                const id = result.id;
-                const titre = properties.Title?.title[0]?.plain_text || 'Sans titre';
-                const description = properties.Description?.rich_text[0]?.plain_text || 'Aucune description';
-                const customer = properties.Customer?.rich_text[0]?.plain_text || null;
-                const date = properties.Date?.rich_text[0]?.plain_text || null;
-                const roles = properties.Roles?.multi_select.map((role) => role.name) || [];
-                const resultUrl = properties.ResultUrl?.url || null;
-                const imageBannerUrl = result.cover?.file?.url || null;
-                // Créer une instance de Projet
-                const projet = new Projet(id, titre, description, customer, date, roles, resultUrl, imageBannerUrl);
-                // Ajouter à la liste des projets
-                projets.push(projet);
-            });
-            // Mise en cache des données
-            myCache.set(cacheKey, projets);
-            // Envoie de la réponse
-            res.status(200).json(projets);
-        } catch (error) {
-            console.error('Erreur dans queryDatabase:', error);
-            res.status(500).json({ error: 'Impossible de récupérer les pages de la base de données.' });
+            },
+            sorts: [
+                {
+                    property: 'Date',
+                    direction: 'descending',
+                },
+            ]
+        });
+        if (!response.results || response.results.length === 0) {
+            return res.status(404).json({ error: 'Aucune page trouvée pour cette database.' });
         }
+        response.results.forEach((result) => {
+            const properties = result.properties;
+        
+            const id = result.id;
+            const titre = properties.Title?.title[0]?.plain_text || 'Sans titre';
+            const description = properties.Description?.rich_text[0]?.plain_text || 'Aucune description';
+            const customer = properties.Customer?.rich_text[0]?.plain_text || null;
+            const date = properties.Date?.rich_text[0]?.plain_text || null;
+            const roles = properties.Roles?.multi_select.map((role) => role.name) || [];
+            const resultUrl = properties.ResultUrl?.url || null;
+            const imageBannerUrl = result.cover?.file?.url || null;
+            const projet = new Projet(id, titre, description, customer, date, roles, resultUrl, imageBannerUrl);
+            projets.push(projet);
+        });
+
+        if (projets.length > 0) {
+            await cache.set(cacheKey, projets);
+        }
+
+        res.json(projets);
+    } catch (error) {
+        console.error('Error:', error);
+        res.status(500).json({ error: 'Server error' });
     }
 };
 
+// Fonction pour traiter les annotations
+function processAnnotations(text) {
+    return {
+        plain_text: text.plain_text,
+        annotations: text.annotations,
+        href: text.href
+    };
+}
+
 exports.retrieveBlockChildren = async (req, res) => {
-    const pageId = req.params.id; // Récupère l'ID de la page depuis les paramètres d'URL
+    const pageId = req.params.id;
     const cacheKey = `blocks_${pageId}`;
-    const cachedData = myCache.get(cacheKey);
-
-    if (cachedData) {
-        return res.json(cachedData);
-    } else {
-        
-        try {
-            const blocks = [];
-            let hasMore = true;
-            let cursor = undefined; // Initialisez le curseur à undefined pour la première requête
-
-            while (hasMore) {
-                // Requête API Notion
-                const response = await notion.blocks.children.list({
-                    block_id: pageId,
-                    page_size: 100,
-                    start_cursor: cursor, // Utilisez le curseur pour les requêtes suivantes
-                });
-                
-                // Si pas de block trouvée
-                if (!response.results || response.results.length === 0) {
-                    return res.status(404).json({ error: 'Aucun bloc trouvé pour cette page.' });
-                }
-                // Traitement des résultats de la requête
-                response.results.forEach((result) => {
-                    const type = result.type;
-                    let block = '';
-                    if (type === "image") {
-                        const imageUrl = result[type]?.external?.url || result[type]?.file?.url || "";
-                        block = { type: type, content: imageUrl };
-                    }
-                    else {
-                        const content = result[type]?.rich_text || [];
-                        const textContent = content.map(item => item.text.content).join("");
-                        block = { type: type, content: textContent }
-                    }
-                    blocks.push(block);
-                });
-
-                // Mettez à jour les variables de pagination
-                hasMore = response.has_more;
-                cursor = response.next_cursor;
-            }
-                myCache.set(cacheKey, blocks); // Mise en cache des données
-                // Envoie de la réponse
-                res.status(200).json(blocks);
-        } catch (error) {
-            console.error('Erreur lors de la récupération des blocs:', error);
-            res.status(404).json({ error: 'Impossible de récupérer les blocs de la page.' });
+    
+    try {
+        const cachedData = await cache.get(cacheKey);
+        if (cachedData) {
+            return res.json(cachedData);
         }
+
+        const blocks = [];
+        let hasMore = true;
+        let cursor = undefined;
+
+        while (hasMore) {
+            const response = await notion.blocks.children.list({
+                block_id: pageId,
+                page_size: 100,
+                start_cursor: cursor,
+            });
+            
+            if (!response.results || response.results.length === 0) {
+                return res.status(404).json({ error: 'Aucun bloc trouvé pour cette page.' });
+            }
+
+            response.results.forEach((result) => {
+                const type = result.type;
+                let block = '';
+                if (type === "image") {
+                    const imageUrl = result[type]?.external?.url || result[type]?.file?.url || "";
+                    block = { type: type, content: imageUrl };
+                } else {
+                    const content = result[type]?.rich_text || [];
+                    const textContent = content.map(item => processAnnotations(item));
+                    block = { type: type, content: textContent }
+                }
+                blocks.push(block);
+            });
+
+            hasMore = response.has_more;
+            cursor = response.next_cursor;
+        }
+
+        if (blocks.length > 0) {
+            await cache.set(cacheKey, blocks);
+        }
+
+        res.json(blocks);
+    } catch (error) {
+        console.error('Error:', error);
+        res.status(404).json({ error: 'Failed to retrieve blocks' });
     }
 };

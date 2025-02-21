@@ -1,0 +1,16 @@
+# tester: https://search.google.com/search-console/welcome?utm_source=about-page 
+# Autoriser tous les robots d'exploration à accéder à tout le site
+User-agent: *
+Disallow:
+
+# Interdire l'accès à un dossier spécifique
+User-agent: *
+Disallow: /private/
+
+# Interdire l'accès à un fichier spécifique
+User-agent: *
+Disallow: /secret-page.html
+
+# Autoriser un robot spécifique à accéder à tout le site
+User-agent: Googlebot
+Disallow:

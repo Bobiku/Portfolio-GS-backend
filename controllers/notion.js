@@ -8,16 +8,6 @@ const notion = new Client({
   auth: process.env.NOTION_TOKEN,
 })
 
-console.log('Using token:', process.env.NOTION_TOKEN);
-
-// exports.getToken = (req, res) => {
-//     // Envoyer un token ou toute autre donnée sécurisée
-//     res.json({
-//         token: process.env.NOTION_TOKEN, // Récupéré depuis les variables d'environnement
-//         databaseId: process.env.NOTION_DATABASE_ID
-//     });
-// };
-
 exports.queryDatabase = async (req, res) => {
     try {
         // Test simple de connexion

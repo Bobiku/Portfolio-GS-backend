@@ -12,16 +12,17 @@ const envFile = process.env.NODE_ENV === 'production'
 
 dotenv.config({ path: path.resolve(__dirname, envFile) });
 
-// Vérifier que le token est chargé
-console.log('Environment:', process.env.NODE_ENV);
-console.log('Token loaded:', !!process.env.NOTION_TOKEN);
-
 // Ensuite charger les routes qui utilisent ces variables
 const notionRoutes = require('./routes/notion');
 const cacheRoutes = require('./routes/cache');
 
 const app = express();
 const redisClient = redis.createClient();
+
+// Route pour servir le fichier robots.txt
+app.get('/robots.txt', (req, res) => {
+    res.sendFile(path.join(__dirname, 'robots.txt'));
+});
 
 // Middleware
 app.use(express.json()); // Pour parser le JSON envoyé dans les requêtes

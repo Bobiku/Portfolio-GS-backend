@@ -13,7 +13,7 @@ EXPOSE 3000
 # Définir la commande à exécuter pour démarrer l'application
 CMD ["npm", "start"]
 
-# Build: docker buildx build --platform=linux/arm64 -t portfolio-gs-backend .
+# Build: docker buildx build --platform=linux/arm64 -t portfolio-gs-backend:[VERSION-plateforme] .
 # Run: docker run -d -p 3000:3000 portfolio-gs-backend
 # Tag registry: docker image tag portfolio-gs-backend registry.local.savaryguillaume.fr/portfolio-gs-backend:[version-plateform]
 # Registry: docker push registry.local.savaryguillaume.fr/portfolio-gs-backend:[version.plateform]

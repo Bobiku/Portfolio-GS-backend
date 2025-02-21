@@ -2,6 +2,21 @@ const express = require('express');
 const cors = require('cors');
 const compression = require('compression');
 const redis = require('redis');
+const dotenv = require('dotenv');
+const path = require('path');
+
+// Charger les variables d'environnement en premier
+const envFile = process.env.NODE_ENV === 'production' 
+    ? '.env.production' 
+    : '.env.development';
+
+dotenv.config({ path: path.resolve(__dirname, envFile) });
+
+// Vérifier que le token est chargé
+console.log('Environment:', process.env.NODE_ENV);
+console.log('Token loaded:', !!process.env.NOTION_TOKEN);
+
+// Ensuite charger les routes qui utilisent ces variables
 const notionRoutes = require('./routes/notion');
 const cacheRoutes = require('./routes/cache');
 

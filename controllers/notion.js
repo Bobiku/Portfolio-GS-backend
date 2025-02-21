@@ -1,16 +1,14 @@
 // Imports
 const { Client } = require("@notionhq/client")
-const dotenv = require('dotenv');
 const cache = require('../utils/cache');
 const { Projet } = require('../models/projet');
-
-// Charger les variables d'environnement
-dotenv.config();
 
 // Initializing a client
 const notion = new Client({
   auth: process.env.NOTION_TOKEN,
 })
+
+console.log('Using token:', process.env.NOTION_TOKEN);
 
 // exports.getToken = (req, res) => {
 //     // Envoyer un token ou toute autre donnée sécurisée
@@ -21,9 +19,13 @@ const notion = new Client({
 // };
 
 exports.queryDatabase = async (req, res) => {
-    const cacheKey = 'notionData';
-    
     try {
+        // Test simple de connexion
+        const testResponse = await notion.users.me();
+        console.log('Notion connection test:', testResponse);
+
+        const cacheKey = 'notionData';
+        
         const cachedData = await cache.get(cacheKey);
         if (cachedData) {
             return res.json(cachedData);
@@ -88,8 +90,11 @@ exports.queryDatabase = async (req, res) => {
 
         res.json(projets);
     } catch (error) {
-        console.error('Error:', error);
-        res.status(500).json({ error: 'Server error' });
+        console.error('Notion API Error:', error);
+        res.status(500).json({ 
+            error: 'Failed to fetch data from Notion',
+            details: error.message
+        });
     }
 };
 

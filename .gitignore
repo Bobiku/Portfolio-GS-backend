@@ -48,3 +48,6 @@ Thumbs.db
 # Redis
 dump.rdb
 *.rdb
+
+# temp
+temp/

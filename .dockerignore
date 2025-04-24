@@ -4,3 +4,4 @@ Dockerfile
 .dockerignore
 .env.development
 .env.production
+temp/

@@ -19,7 +19,7 @@ class RedisCache {
         }
     }
 
-    async set(key, value, ttl = 3600) {
+    async set(key, value, ttl = 86400) {
         try {
             await this.connect();
             return await this.client.set(key, JSON.stringify(value), { EX: ttl });

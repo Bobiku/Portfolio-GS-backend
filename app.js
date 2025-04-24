@@ -35,6 +35,9 @@ app.use((req, res, next) => {
     next();
 });
 
+// Servir des fichiers statiques à partir du dossier temp
+app.use('/temp', express.static(path.join(__dirname, 'temp')));
+
 // Routes
 app.use('/api/notion', (req, res, next) => {
     req.redisClient = redisClient;

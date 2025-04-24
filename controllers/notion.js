@@ -2,6 +2,7 @@
 const { Client } = require("@notionhq/client")
 const cache = require('../utils/cache');
 const { Projet } = require('../models/projet');
+const imageService = require('../services/image.service');
 
 // Initializing a client
 const notion = new Client({
@@ -11,8 +12,8 @@ const notion = new Client({
 exports.queryDatabase = async (req, res) => {
     try {
         // Test simple de connexion
-        const testResponse = await notion.users.me();
-        console.log('Notion connection test:', testResponse);
+        // const testResponse = await notion.users.me();
+        // console.log('Notion connection test:', testResponse);
 
         const cacheKey = 'notionData';
         
@@ -59,7 +60,7 @@ exports.queryDatabase = async (req, res) => {
         if (!response.results || response.results.length === 0) {
             return res.status(404).json({ error: 'Aucune page trouvée pour cette database.' });
         }
-        response.results.forEach((result) => {
+        for (const result of response.results) {
             const properties = result.properties;
         
             const id = result.id;
@@ -70,9 +71,18 @@ exports.queryDatabase = async (req, res) => {
             const roles = properties.Roles?.multi_select.map((role) => role.name) || [];
             const resultUrl = properties.ResultUrl?.url || null;
             const imageBannerUrl = result.cover?.file?.url || null;
-            const projet = new Projet(id, titre, description, customer, date, roles, resultUrl, imageBannerUrl);
+            
+            // Appeler la méthode processImage pour traiter l'image
+            let processedImageUrls = {};
+            if (imageBannerUrl) {
+                processedImageUrls = await imageService.processImage(imageBannerUrl, id, 'bannerProjet');
+            }
+
+            const projet = new Projet(id, titre, description, customer, date, roles, resultUrl, processedImageUrls);
             projets.push(projet);
-        });
+            // console.log('Image Banner URL:', imageBannerUrl);
+            // console.log('Processed Image URLs:', processedImageUrls);
+        }
 
         if (projets.length > 0) {
             await cache.set(cacheKey, projets);
@@ -100,7 +110,7 @@ function processAnnotations(text) {
 exports.retrieveBlockChildren = async (req, res) => {
     const pageId = req.params.id;
     const cacheKey = `blocks_${pageId}`;
-    
+    let numImg = 0;
     try {
         const cachedData = await cache.get(cacheKey);
         if (cachedData) {
@@ -122,19 +132,23 @@ exports.retrieveBlockChildren = async (req, res) => {
                 return res.status(404).json({ error: 'Aucun bloc trouvé pour cette page.' });
             }
 
-            response.results.forEach((result) => {
+            for (const result of response.results) {
                 const type = result.type;
                 let block = '';
                 if (type === "image") {
                     const imageUrl = result[type]?.external?.url || result[type]?.file?.url || "";
-                    block = { type: type, content: imageUrl };
+                    numImg++;
+                    // Appeler la méthode processImage pour traiter l'image
+                    let processedImageUrls = {};
+                    processedImageUrls = await imageService.processImage(imageUrl, pageId, 'image'+numImg);
+                    block = { type: type, content: processedImageUrls };
                 } else {
                     const content = result[type]?.rich_text || [];
                     const textContent = content.map(item => processAnnotations(item));
-                    block = { type: type, content: textContent }
+                    block = { type: type, content: textContent };
                 }
                 blocks.push(block);
-            });
+            }
 
             hasMore = response.has_more;
             cursor = response.next_cursor;
